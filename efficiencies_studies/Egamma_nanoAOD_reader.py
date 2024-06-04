@@ -22,7 +22,7 @@ min_pt_lead_photon = 35.0
 samplejson = 'keep_v13_sample.json'
 # load dataset
 xrootd_pfx = "root://"
-limit = 2 # limit the number of read files
+limit = 25 # limit the number of read files
 xrd_pfx_len = len(xrootd_pfx)
 with open(samplejson) as f:
     sample_dict = json.load(f)
@@ -32,10 +32,21 @@ for key in sample_dict.keys():
 
 # Looping over the files
 total_events = 0
-total_pass_events = 0
+total_pass_EE_leak = 0
+total_goodVertices = 0
+total_globalSuperTightHalo2016Filter = 0
+total_HBHENoiseFilter = 0
+total_HBHENoiseIsoFilter = 0
+total_EcalDeadCellTriggerPrimitiveFilter = 0
+total_BadPFMuonFilter = 0
+total_eeBadScFilter = 0
+total_all_filters = 0
+total_photons = 0
 
 for key in sample_dict.keys():
     for file in sample_dict[key]:
+
+        print('Processing file: ', file)
 
         fname = file
         # Pass the file name directly as a string
@@ -47,18 +58,16 @@ for key in sample_dict.keys():
         ).events()
 
         # defining the pre-selection
-        photons, mask = utils.photon_preselection(photons = events.Photon, events=events,apply_electron_veto=True, year="2022")
-
+        photons = utils.photon_preselection(photons = events.Photon, events=events,apply_electron_veto=True, year="2022")
+        #photons = ak.where(ak.num(photons) == 0, None, photons)
+        #photons = events.Photon
+ 
         # Now diphoton selection
         # sort photons in each event descending in pt
         # make descending-pt combinations of photons
         photons = photons[ak.argsort(photons.pt, ascending=False)]
-        photons["charge"] = ak.zeros_like(
-            photons.pt
-        )  # added this because charge is not a property of photons in nanoAOD v11. We just assume every photon has charge zero...
-        diphotons = ak.combinations(
-            photons, 2, fields=["pho_lead", "pho_sublead"]
-        )
+        photons["charge"] = ak.zeros_like(photons.pt)  
+        diphotons = ak.combinations(photons, 2, fields=["pho_lead", "pho_sublead"])
 
         # the remaining cut is to select the leading photons
         # the previous sort assures the order
@@ -86,10 +95,9 @@ for key in sample_dict.keys():
             ak.argsort(diphotons.pt, ascending=False)
         ]
 
-        # Some selection!
-        selection_mask = ~ak.is_none(diphotons)
-        diphotons      = diphotons[selection_mask]
-        events         = events[selection_mask ]
+        # Mass selection
+        mass_mask = (diphotons.mass > 100) & (diphotons.mass < 180)
+        diphotons = diphotons[mass_mask]
 
         # Determine if event passes fiducial Hgg cuts at detector-level
         if fiducialCuts == 'classical':
@@ -104,9 +112,75 @@ for key in sample_dict.keys():
 
         diphotons = diphotons[fid_det_passed]
 
-        # Now lets count the number of events that passes the filters and the total number of events
-        total_events = total_events + len(events)
-        total_pass_events = total_pass_events +  len( events[events.Flag.BadPFMuonFilter == True] )
+        # Some selection!
+        selection_mask = ak.num(diphotons) >= 1  #~ak.is_none(diphotons)
+        diphotons      = diphotons[selection_mask]
+        events         = events[selection_mask ]
+        
+        # Lets count the total number of events before the filters!
+        total_events = total_events + len( events )
+        total_photons = total_photons + len( events)
 
-print( total_pass_events, total_events )
-print( 'BadPFMuonFilter Efficiency: ', total_pass_events/total_events )
+        flags = ["goodVertices", "globalSuperTightHalo2016Filter", "HBHENoiseFilter", "HBHENoiseIsoFilter", "EcalDeadCellTriggerPrimitiveFilter", "BadPFMuonFilter", "eeBadScFilter"]
+        
+        print('We are on the flags part!!')
+        for flag in flags:
+            if( "goodVertices" in flag ):
+                total_goodVertices = total_goodVertices + len( events[events.Flag[flag] == True] )
+            elif( "globalSuperTightHalo2016Filter" in flag ):
+                total_globalSuperTightHalo2016Filter = total_globalSuperTightHalo2016Filter + len( events[events.Flag[flag] == True] )
+            elif( "HBHENoiseFilter" in flag ):
+                total_HBHENoiseFilter = total_HBHENoiseFilter + len( events[events.Flag[flag] == True] )
+            elif( "HBHENoiseIsoFilter" in flag ):
+                total_HBHENoiseIsoFilter = total_HBHENoiseIsoFilter + len( events[events.Flag[flag] == True] )
+            elif( "EcalDeadCellTriggerPrimitiveFilter" in flag ):
+                total_EcalDeadCellTriggerPrimitiveFilter = total_EcalDeadCellTriggerPrimitiveFilter + len( events[events.Flag[flag] == True] )
+            elif( "BadPFMuonFilter" in flag ):
+                total_BadPFMuonFilter = total_BadPFMuonFilter + len( events[events.Flag[flag] == True] )
+            elif( "eeBadScFilter" in flag ):
+                total_eeBadScFilter = total_eeBadScFilter + len( events[events.Flag[flag] == True] )
+                
+        # All filters - logical and
+        logi1 = numpy.logical_and(events.Flag["goodVertices"] == True ,   events.Flag["globalSuperTightHalo2016Filter"] == True )
+        logi2 = numpy.logical_and(events.Flag["HBHENoiseFilter"] == True ,  events.Flag["HBHENoiseIsoFilter"] == True )
+        logi3 = numpy.logical_and(events.Flag["EcalDeadCellTriggerPrimitiveFilter"] == True ,  events.Flag["BadPFMuonFilter"] == True )
+        logi4 = numpy.logical_and(events.Flag["eeBadScFilter"] == True ,  logi3 )
+        logic_1_2 = numpy.logical_and(logi1, logi2)
+        logic_3_4 = numpy.logical_and(logi4, logi3)
+        ultimate_logic = numpy.logical_and(logic_1_2, logic_3_4)
+        total_all_filters = total_all_filters + len( events[ ultimate_logic == True ] )
+
+        # Adding the SC eta
+        events.Photon = utils.add_photon_SC_eta(events.Photon, events.PV)
+
+        # EE veto leak: - also need to check this efficiency
+        events.Photon = utils.veto_EEleak_flag(events.Photon)
+        photons = events.Photon
+        
+        # We need to do it again after the EEvetor
+        photons = photons[ak.argsort(photons.pt, ascending=False)]
+        photons["charge"] = ak.zeros_like(photons.pt)  
+        diphotons = ak.combinations(photons, 2, fields=["pho_lead", "pho_sublead"])
+
+        # the remaining cut is to select the leading photons
+        # the previous sort assures the order
+        diphotons = diphotons[
+            diphotons["pho_lead"].pt > min_pt_lead_photon
+        ]
+
+        selection_mask = ak.num(diphotons) >= 1 #~ak.is_none(diphotons)
+        diphotons      = diphotons[selection_mask]
+        events         = events[selection_mask ]
+        
+        total_pass_EE_leak = total_pass_EE_leak + len( events )
+        
+print( 'Total number of events: ',  total_events )
+print( 'EE leak efficiency: ',  total_pass_EE_leak/total_photons )
+print('goodVertices efficiency: ', total_goodVertices/total_events)
+print('globalSuperTightHalo2016Filter efficiency: ', total_globalSuperTightHalo2016Filter/total_events)
+print('HBHENoiseFilter efficiency: ', total_HBHENoiseFilter/total_events)
+print('HBHENoiseIsoFilter efficiency: ', total_HBHENoiseIsoFilter/total_events)
+print('EcalDeadCellTriggerPrimitiveFilter efficiency: ', total_EcalDeadCellTriggerPrimitiveFilter/total_events)
+print('BadPFMuonFilter efficiency: ', total_BadPFMuonFilter/total_events)
+print('eeBadScFilter efficiency: ', total_eeBadScFilter/total_events)
+print('All filters efficiency: ', total_all_filters/total_events)

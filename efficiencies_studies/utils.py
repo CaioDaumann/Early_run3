@@ -1,5 +1,5 @@
-import awkward
-import numpy
+import awkward 
+import numpy 
 
 
 # photon preselection for Run3 -> take as input nAOD Photon collection and return the Photons that pass
@@ -183,6 +183,7 @@ def photon_preselection(
     )
     # not apply electron veto for for TnP workflow
     e_veto = e_veto if apply_electron_veto else -1
+    
     return photons[
         (photons.electronVeto > e_veto)
         & (photons.pt > min_pt_photon)
@@ -197,18 +198,108 @@ def photon_preselection(
             | (rel_iso < max_chad_rel_iso)
         )
         & (isEB_high_r9 | isEB_low_r9 | isEE_high_r9 | isEE_low_r9)
-    ], (
-        (photons.electronVeto > e_veto)
-        & (photons.pt > min_pt_photon)
-        & (photons.isScEtaEB | photons.isScEtaEE)
-        & (photons.mvaID > min_mvaid)
-        & (photons.hoe < max_hovere)
-        & (
-            (photons.r9 > min_full5x5_r9)
-            | (
-                rel_iso * photons.pt < max_chad_iso
+    ]
+    
+## EE leak veto !!
+def veto_EEleak_flag(egammas: awkward.Array) -> awkward.Array:
+    """
+    Add branch to veto electrons/photons in the EE+ leak region for 2022. Ref to:
+    https://twiki.cern.ch/twiki/bin/viewauth/CMS/PdmVRun3Analysis#Notes_on_addressing_EE_issue_in
+    """
+    if hasattr(egammas, "isScEtaEE"):
+        # photons
+        out_EEleak_region = (egammas.isScEtaEB) | (
+            (egammas.isScEtaEE) & (
+                # keepng all the EE- photons : nanoAOD >= V13 with ScEta stored; Else with "eta" instead
+                (egammas.ScEta < -1.5) | (
+                    # keepng the EE+ photons not in the leakage region
+                    (egammas.ScEta > 1.5) & (
+                        (egammas.seediEtaOriX >= 45)
+                        | (egammas.seediPhiOriY <= 72)
+                    )
+                )
             )
-            | (rel_iso < max_chad_rel_iso)
         )
-        & (isEB_high_r9 | isEB_low_r9 | isEE_high_r9 | isEE_low_r9)
+    else:
+        # electrons
+        electron_ScEta = egammas.eta + egammas.deltaEtaSC
+        out_EEleak_region = (numpy.abs(electron_ScEta) < self.gap_barrel_eta) | (
+            (numpy.abs(electron_ScEta) > self.gap_endcap_eta)
+            & (numpy.abs(electron_ScEta) < self.max_sc_eta) & (
+                # keepng all the EE- objects
+                (electron_ScEta < -1.5) | (
+                    # keepng the EE+ objects not in the leakage region
+                    (electron_ScEta > 1.5) & (
+                        (egammas.seediEtaOriX >= 45)
+                        | (egammas.seediPhiOriY <= 72)
+                    )
+                )
+            )
+        )
+
+    egammas["vetoEELeak"] = out_EEleak_region
+
+    return egammas
+
+# Adds the SC eta to the photon object
+def add_photon_SC_eta(photons: awkward.Array, PV: awkward.Array) -> awkward.Array:
+    """
+    Add supercluster eta to photon object, following the implementation from https://github.com/bartokm/GbbMET/blob/026dac6fde5a1d449b2cfcaef037f704e34d2678/analyzer/Analyzer.h#L2487
+    In the current NanoAODv11, there is only the photon eta which is the SC eta corrected by the PV position.
+    The SC eta is needed to correctly apply a number of corrections and systematics.
+    """
+
+    PV_x = PV.x.to_numpy()
+    PV_y = PV.y.to_numpy()
+    PV_z = PV.z.to_numpy()
+
+    mask_barrel = photons.isScEtaEB
+    mask_endcap = photons.isScEtaEE
+
+    tg_theta_over_2 = numpy.exp(-photons.eta)
+    # avoid dividion by zero
+    tg_theta_over_2 = numpy.where(tg_theta_over_2 == 1., 1 - 1e-10, tg_theta_over_2)
+    tg_theta = 2 * tg_theta_over_2 / (1 - tg_theta_over_2 * tg_theta_over_2)  # tg(a+b) = tg(a)+tg(b) / (1-tg(a)*tg(b))
+
+    # calculations for EB
+    R = 130.
+    angle_x0_y0 = numpy.zeros_like(PV_x)
+
+    angle_x0_y0[PV_x > 0] = numpy.arctan(PV_y[PV_x > 0] / PV_x[PV_x > 0])
+    angle_x0_y0[PV_x < 0] = numpy.pi + numpy.arctan(PV_y[PV_x < 0] / PV_x[PV_x < 0])
+    angle_x0_y0[((PV_x == 0) & (PV_y >= 0))] = numpy.pi / 2
+    angle_x0_y0[((PV_x == 0) & (PV_y < 0))] = -numpy.pi / 2
+
+    alpha = angle_x0_y0 + (numpy.pi - photons.phi)
+    sin_beta = numpy.sqrt(PV_x**2 + PV_y**2) / R * numpy.sin(alpha)
+    beta = numpy.abs(numpy.arcsin(sin_beta))
+    gamma = numpy.pi / 2 - alpha - beta
+    length = numpy.sqrt(R**2 + PV_x**2 + PV_y**2 - 2 * R * numpy.sqrt(PV_x**2 + PV_y**2) * numpy.cos(gamma))
+    z0_zSC = length / tg_theta
+
+    tg_sctheta = numpy.copy(tg_theta)
+    # correct values for EB
+    tg_sctheta = awkward.where(mask_barrel, R / (PV_z + z0_zSC), tg_sctheta)
+
+    # calculations for EE
+    intersection_z = numpy.where(photons.eta > 0, 310., -310.)
+    base = intersection_z - PV_z
+    r = base * tg_theta
+    crystalX = PV_x + r * numpy.cos(photons.phi)
+    crystalY = PV_y + r * numpy.sin(photons.phi)
+    # correct values for EE
+    tg_sctheta = awkward.where(
+        mask_endcap, numpy.sqrt(crystalX**2 + crystalY**2) / intersection_z, tg_sctheta
     )
+
+    sctheta = numpy.arctan(tg_sctheta)
+    sctheta = awkward.where(
+        sctheta < 0, numpy.pi + sctheta, sctheta
+    )
+    ScEta = -numpy.log(
+        numpy.tan(sctheta / 2)
+    )
+
+    photons["ScEta"] = ScEta
+
+    return photons
