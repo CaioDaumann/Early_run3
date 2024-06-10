@@ -19,10 +19,10 @@ min_pt_photon = 25.0
 min_pt_lead_photon = 35.0
 
 # Lets read the .json
-samplejson = 'keep_v13_sample.json'
+samplejson = 'higgs_samples.json'
 # load dataset
 xrootd_pfx = "root://"
-limit = 25 # limit the number of read files
+limit = 50 # limit the number of read files
 xrd_pfx_len = len(xrootd_pfx)
 with open(samplejson) as f:
     sample_dict = json.load(f)
@@ -50,12 +50,16 @@ for key in sample_dict.keys():
 
         fname = file
         # Pass the file name directly as a string
-        events = NanoEventsFactory.from_root(
-            fname,
-            schemaclass=NanoAODSchema,
-            treepath="Events",  # ensure the treepath is correctly specified
-            metadata={"dataset": "DYJets"},
-        ).events()
+        try:
+            events = NanoEventsFactory.from_root(
+                fname,
+                schemaclass=NanoAODSchema,
+                treepath="Events",  # ensure the treepath is correctly specified
+                metadata={"dataset": "DYJets"},
+            ).events()
+        except:
+            print('Error reading file: ', file)
+            continue
 
         # defining the pre-selection
         photons = utils.photon_preselection(photons = events.Photon, events=events,apply_electron_veto=True, year="2022")
@@ -155,7 +159,7 @@ for key in sample_dict.keys():
 
         # EE veto leak: - also need to check this efficiency
         events.Photon = utils.veto_EEleak_flag(events.Photon)
-        photons = events.Photon
+        photons = events.Photon[ events.Photon["vetoEELeak"] == True  ]
         
         # We need to do it again after the EEvetor
         photons = photons[ak.argsort(photons.pt, ascending=False)]
@@ -173,7 +177,15 @@ for key in sample_dict.keys():
         events         = events[selection_mask ]
         
         total_pass_EE_leak = total_pass_EE_leak + len( events )
-        
+    
+    #### Do 
+    print( ' EE leak efficiency: ' )
+    print( 'Process: ', str(key) , ' - Eff: ' , round(total_pass_EE_leak/total_photons,2) )
+    
+    total_pass_EE_leak = 0
+    total_photons = 0
+
+print('\n\n')
 print( 'Total number of events: ',  total_events )
 print( 'EE leak efficiency: ',  total_pass_EE_leak/total_photons )
 print('goodVertices efficiency: ', total_goodVertices/total_events)
