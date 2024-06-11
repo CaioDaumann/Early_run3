@@ -18,39 +18,33 @@ import standalone_plot        as plot_utils
 #import zmmg_process_utils     as zmmg_utils
 #from   apply_flow_zmmg        import zmmg_kinematics_reweighting
 
+# This selection is actually made specially for electrons reconstructed as photons from base
 def perform_zee_selection( data_df, mc_df ):
     # first we need to calculathe the invariant mass of the electron pair
 
     # variables names used to calculate the mass 
-    data_mass_vars = ["tag_pt","tag_ScEta","tag_phi","probe_pt","probe_ScEta","probe_phi","fixedGridRhoAll", "tag_mvaID"]
-    mass_vars      = ["tag_pt","tag_ScEta","tag_phi","probe_pt","probe_ScEta","probe_phi","fixedGridRhoAll", "tag_mvaID"]
+    data_mass_vars = ["lead_pt","lead_ScEta","lead_phi","sublead_pt","sublead_ScEta","sublead_phi","fixedGridRhoAll", "lead_mvaID"]
+    mass_vars      = ["lead_pt","lead_ScEta","lead_phi","sublead_pt","sublead_ScEta","sublead_phi","fixedGridRhoAll", "lead_mvaID"]
 
     mass_inputs_data = np.array( data_df[data_mass_vars]) 
     mass_inputs_mc   = np.array( mc_df[mass_vars]  )
 
-    # calculaitng the invariant mass with the expression of a par of massless particles 
-    mass_data = np.array( data_df["mass"])  #np.sqrt(  2*mass_inputs_data[:,0]*mass_inputs_data[:,3]*( np.cosh(  mass_inputs_data[:,1] -  mass_inputs_data[:,4]  )  - np.cos( mass_inputs_data[:,2]  -mass_inputs_data[:,5] )  )  )
-    mass_mc   = np.array( mc_df["mass"]  )  #np.sqrt(  2*mass_inputs_mc[:,0]*mass_inputs_mc[:,3]*( np.cosh(  mass_inputs_mc[:,1] -  mass_inputs_mc[:,4]  )  - np.cos( mass_inputs_mc[:,2]  -mass_inputs_mc[:,5] )  )  )
+    # Calculating the invariant mass with the expression of a par of massless particles 
+    mass_data = np.array( data_df["mass"])  
+    mass_mc   = np.array( mc_df["mass"]  ) 
 
     # now, in order to perform the needed cuts two masks will be created
     mask_data = np.logical_and( mass_data > 80 , mass_data < 100  )
-    mask_data = np.logical_and( mask_data , mass_inputs_data[:,0] > 40  ) #tag pt cut
-    mask_data = np.logical_and( mask_data , mass_inputs_data[:,3] > 22  ) #probe pt cut
+    mask_data = np.logical_and( mask_data , mass_inputs_data[:,0] > 35  ) #tag pt cut
+    mask_data = np.logical_and( mask_data , mass_inputs_data[:,3] > 25  ) #probe pt cut
     mask_data = np.logical_and( mask_data , np.abs(mass_inputs_data[:,4]) < 2.5  )  # eta cut
     mask_data = np.logical_and( mask_data , np.abs(mass_inputs_data[:,5]) < 3.1415  ) # phi cut
-    mask_data = np.logical_and( mask_data , mass_inputs_data[:,6] < 100  )
-    mask_data = np.logical_and( mask_data , mass_inputs_data[:,6] > 0  )
-    mask_data = np.logical_and( mask_data , mass_inputs_data[:,7] > 0.0  )  # tag mvaID cut
-    
 
     mask_mc   = np.logical_and( mass_mc > 80 , mass_mc < 100  )
-    mask_mc   = np.logical_and( mask_mc , mass_inputs_mc[:,0] > 40  )
-    mask_mc   = np.logical_and( mask_mc , mass_inputs_mc[:,3] > 22  )
+    mask_mc   = np.logical_and( mask_mc , mass_inputs_mc[:,0] > 35  )
+    mask_mc   = np.logical_and( mask_mc , mass_inputs_mc[:,3] > 25  )
     mask_mc   = np.logical_and( mask_mc , np.abs(mass_inputs_mc[:,4]) < 2.5  )
     mask_mc   = np.logical_and( mask_mc , np.abs(mass_inputs_mc[:,5]) < 3.1415  )
-    mask_mc   = np.logical_and( mask_mc , mass_inputs_mc[:,6] > 0  )
-    mask_mc   = np.logical_and( mask_mc , mass_inputs_mc[:,6] < 100  )
-    mask_mc   = np.logical_and( mask_mc , mass_inputs_mc[:,7] > 0.0  )
 
     # return the masks for further operations
     return mask_data, mask_mc
@@ -119,191 +113,64 @@ def perform_reweighting(simulation_df, data_df):
     return data_weights, simulation_weights
 
 
-#Read the pytorch tensors stored by the readdata.py script
-"""
-var_list_corr = [   "probe_energyRaw",
-                    "probe_corr_r9", 
-                    "probe_corr_sieie",
-                    "probe_corr_etaWidth",
-                    "probe_corr_phiWidth",
-                    "probe_corr_sieip",
-                    "probe_corr_s4",
-                    "probe_corr_hoe",
-                    "probe_corr_ecalPFClusterIso",
-                    "probe_corr_trkSumPtHollowConeDR03",
-                    "probe_corr_trkSumPtSolidConeDR04",
-                    "probe_corr_pfChargedIso",
-                    "probe_corr_pfChargedIsoWorstVtx",
-                    "probe_corr_esEffSigmaRR",
-                    "probe_corr_esEnergyOverRawE",
-                    "probe_corr_hcalPFClusterIso",
-                    "probe_corr_energyErr",
-                    "sigma_m_over_m_corr",
-                    "probe_corr_mvaID_run3"]
-"""
 
-# For Pauls's validation
-
-"""
-var_list_corr = ["probe_energyRaw",
-                "probe_r9_corr", 
-                "probe_sieie_corr",
-                "probe_etaWidth_corr",
-                "probe_phiWidth_corr",
-                "probe_sieip_corr",
-                "probe_s4_corr",
-                "probe_hoe_corr",
-                "probe_ecalPFClusterIso_corr",
-                "probe_trkSumPtHollowConeDR03_corr",
-                "probe_trkSumPtSolidConeDR04_corr",
-                "probe_pfChargedIso_corr",
-                "probe_pfChargedIsoWorstVtx_corr",
-                "probe_esEffSigmaRR_corr",
-                "probe_esEnergyOverRawE_corr",
-                "probe_hcalPFClusterIso_corr",
-                "probe_energyErr_corr",
-                "probe_mvaID_corr",
-                "sigma_m_over_m_corr",
-                "probe_pt",
-                "probe_eta",
-                "fixedGridRhoAll"]
-
-
-data_var_list    = ["probe_energyRaw",
-                    "probe_r9", 
-                    "probe_sieie",
-                    "probe_etaWidth",
-                    "probe_phiWidth",
-                    "probe_sieip",
-                    "probe_s4",
-                    "probe_hoe",
-                    "probe_ecalPFClusterIso",
-                    "probe_trkSumPtHollowConeDR03",
-                    "probe_trkSumPtSolidConeDR04",
-                    "probe_pfChargedIso",
-                    "probe_pfChargedIsoWorstVtx",
-                    "probe_esEffSigmaRR",
-                    "probe_esEnergyOverRawE",
-                    "probe_hcalPFClusterIso",
-                    "probe_energyErr",
-                    "probe_mvaID",
-                    "sigma_m_over_m",
-                    "probe_pt",
-                    "probe_eta",
-                    "fixedGridRhoAll"
-                    ]
-
-var_list    = [ "probe_energyRaw",
-                "probe_r9", 
-                "probe_sieie",
-                "probe_etaWidth",
-                "probe_phiWidth",
-                "probe_sieip",
-                "probe_s4",
-                "probe_hoe",
-                "probe_ecalPFClusterIso",
-                "probe_trkSumPtHollowConeDR03",
-                "probe_trkSumPtSolidConeDR04",
-                "probe_pfChargedIso",
-                "probe_pfChargedIsoWorstVtx",
-                "probe_esEffSigmaRR",
-                "probe_esEnergyOverRawE",
-                "probe_hcalPFClusterIso",
-                "probe_energyErr",
-                "probe_mvaID",
-                "sigma_m_over_m",
-                "probe_pt",
-                "probe_eta",
-                "fixedGridRhoAll"
+var_list_corr = [
+                "lead_pt", 
+                "fixedGridRhoAll",
+                "lead_ScEta",
+                "lead_phi",
+                "sublead_pt", 
+                "sublead_ScEta",
+                "sublead_phi",
+                "pt",
+                "eta",
+                "mass"
                 ]
-"""
 
 
 
-var_list_corr = ["probe_energyRaw",
-                "probe_pt", 
-                "probe_r9", 
-                "probe_sieie",
-                "probe_etaWidth",
-                "probe_phiWidth",
-                "probe_sieip",
-                "probe_s4",
-                "probe_hoe",
-                "probe_ecalPFClusterIso",
-                "probe_trkSumPtHollowConeDR03",
-                "probe_trkSumPtSolidConeDR04",
-                "probe_pfChargedIsoWorstVtx",
-                "probe_esEffSigmaRR",
-                "probe_esEnergyOverRawE",
-                "probe_hcalPFClusterIso",
-                "probe_mvaID",
-                "fixedGridRhoAll",
-                "probe_ScEta",
-                "probe_energyErr",
-                "probe_phi"]
-
-
-
-data_var_list    = ["probe_energyRaw",
-                    "probe_pt", 
-                    "probe_r9", 
-                    "probe_sieie",
-                    "probe_etaWidth",
-                    "probe_phiWidth",
-                    "probe_sieip",
-                    "probe_s4",
-                    "probe_hoe",
-                    "probe_ecalPFClusterIso",
-                    "probe_trkSumPtHollowConeDR03",
-                    "probe_trkSumPtSolidConeDR04",
-                    "probe_pfChargedIsoWorstVtx",
-                    "probe_esEffSigmaRR",
-                    "probe_esEnergyOverRawE",
-                    "probe_hcalPFClusterIso",
-                    "probe_mvaID",
+data_var_list    = [
+                    "lead_pt", 
                     "fixedGridRhoAll",
-                    "probe_ScEta",
-                    "probe_energyErr",
-                    "probe_phi"
+                    "lead_ScEta",
+                    "lead_phi", 
+                    "sublead_pt", 
+                    "sublead_ScEta",
+                    "sublead_phi", 
+                    "pt",
+                    "eta",
+                    "mass"
                     ]
 
 
-var_list    = [ "probe_energyRaw",
-                "probe_pt", 
-                "probe_raw_r9", 
-                "probe_raw_sieie",
-                "probe_raw_etaWidth",
-                "probe_raw_phiWidth",
-                "probe_raw_sieip",
-                "probe_raw_s4",
-                "probe_raw_hoe",
-                "probe_raw_ecalPFClusterIso",
-                "probe_raw_trkSumPtHollowConeDR03",
-                "probe_raw_trkSumPtSolidConeDR04",
-                "probe_raw_pfChargedIsoWorstVtx",
-                "probe_raw_esEffSigmaRR",
-                "probe_raw_esEnergyOverRawE",
-                "probe_raw_hcalPFClusterIso",
-                "probe_mvaID_nano",
+var_list    = [ 
+                "lead_pt", 
                 "fixedGridRhoAll",
-                "probe_ScEta",
-                "probe_raw_energyErr",
-                "probe_phi"
+                "lead_ScEta",
+                "lead_phi",
+                "sublead_pt", 
+                "sublead_ScEta",
+                "sublead_phi", 
+                "pt",
+                "eta",
+                "mass"
                 ]
 
 
 data_conditions_list = [ "probe_pt","probe_ScEta","probe_phi","fixedGridRhoAll"]
-conditions_list = [ "probe_pt","probe_ScEta","probe_phi","fixedGridRhoAll"]
+conditions_list      = [ "probe_pt","probe_ScEta","probe_phi","fixedGridRhoAll"]
 
 
 def read_data():
+
+    # We read the whole data and MC and weight MC by the absolute luminosity of pre and postEE
     
     # Reading data!
-    files = glob.glob(    "/net/scratch_cms3a/daumann/HiggsDNA/scripts/v13_runners/zee_files/Rerun_after_probe_selection/dataF_v13/nominal/*.parquet")
-    files_2 = glob.glob(  "/net/scratch_cms3a/daumann/HiggsDNA/scripts/v13_runners/zee_files/Rerun_after_probe_selection/dataG_v13/nominal/*.parquet")
-    files_3 = glob.glob(  "/net/scratch_cms3a/daumann/HiggsDNA/scripts/v13_runners/zee_files/Rerun_after_probe_selection/dataE_v13/nominal/*.parquet")
-    files_4 = glob.glob(  "/net/scratch_cms3a/daumann/HiggsDNA/scripts/v13_runners/zee_files/Rerun_after_probe_selection/dataC_v13/nominal/*.parquet")
-    files_5 = glob.glob(  "/net/scratch_cms3a/daumann/HiggsDNA/scripts/v13_runners/zee_files/Rerun_after_probe_selection/dataD_v13/nominal/*.parquet") 
+    files = glob.glob(    "/net/scratch_cms3a/daumann/HiggsDNA/scripts/v13_runners/Hgg_files/DY_with_base_checks/DataF_2022/nominal/*.parquet")
+    files_2 = glob.glob(  "/net/scratch_cms3a/daumann/HiggsDNA/scripts/v13_runners/Hgg_files/DY_with_base_checks/DataG_2022/nominal/*.parquet")
+    files_3 = glob.glob(  "/net/scratch_cms3a/daumann/HiggsDNA/scripts/v13_runners/Hgg_files/DY_with_base_checks/DataE_2022/nominal/*.parquet")
+    files_4 = glob.glob(  "/net/scratch_cms3a/daumann/HiggsDNA/scripts/v13_runners/Hgg_files/DY_with_base_checks/DataC_2022/nominal/*.parquet")
+    files_5 = glob.glob(  "/net/scratch_cms3a/daumann/HiggsDNA/scripts/v13_runners/Hgg_files/DY_with_base_checks/DataD_2022/nominal/*.parquet") 
 
     files = [files, files_2, files_3, files_4, files_5]
 
@@ -312,8 +179,8 @@ def read_data():
 
     #data_df["probe_energyErr"] = data_df["probe_energyErr"]/ data_df["probe_pt"]*np.cosh( data_df["probe_eta"] ) 
 
-    postEE_files = glob.glob("/net/scratch_cms3a/daumann/HiggsDNA/scripts/v13_runners/zee_files/Rerun_after_probe_selection/DY_postEE_v13/nominal/*.parquet") 
-    preEE_files = glob.glob("/net/scratch_cms3a/daumann/HiggsDNA/scripts/v13_runners/zee_files/Rerun_after_probe_selection/DY_preEE_v13/nominal/*.parquet")
+    postEE_files = glob.glob("/net/scratch_cms3a/daumann/HiggsDNA/scripts/v13_runners/Hgg_files/DY_with_base_checks_with_SS_3/DYto2L_postEE/nominal/*.parquet") 
+    preEE_files  = glob.glob("/net/scratch_cms3a/daumann/HiggsDNA/scripts/v13_runners/Hgg_files/DY_with_base_checks_with_SS_3/DYto2L_preEE/nominal/*.parquet")
 
     postEE = [pd.read_parquet(f) for f in postEE_files]
     postEE = pd.concat(postEE,ignore_index=True)  
@@ -342,144 +209,75 @@ def main():
     mask_data, mask_mc = perform_zee_selection( data_df, mc_df )
 
     # we still need the selection, and the rw!
-    data_test_weights    = np.ones( len(data_df["probe_r9"]))
+    data_test_weights    = np.ones( len(data_df["lead_r9"]))
     mc_test_weights      = np.array( mc_df["weight"] )
-    #data_test_weights, mc_test_weights = perform_zee_kinematics_reweighting(data_df[data_conditions_list][mask_data], data_test_weights[mask_data], mc_df[conditions_list][mask_mc], mc_test_weights[mask_mc], preEE = ~PostEE_plots)
-    data_test_weights, mc_test_weights = perform_reweighting(mc_df[mask_mc], data_df[mask_data])
+    #data_test_weights, mc_test_weights = perform_reweighting(mc_df[mask_mc], data_df[mask_data])
 
     # This carries the corrected inputs
     mc_df = mc_df[mask_mc]
+    mc_test_weights = mc_test_weights[mask_mc]
     
     data_df = data_df[mask_data]
     data_vector = np.array(data_df[data_var_list])
-    data_test_weights    = np.ones( len(data_df["probe_r9"]))
+    data_test_weights    = np.ones( len(data_df["lead_r9"]))
 
     samples              = np.array( mc_df[var_list_corr]  )
 
     #mc_test_weights      = np.array( mc_df["weight"])
     mc_vector = np.array(mc_df[var_list] )
     
-    # As a first trick, we plot the diferrence in correlation wrt to data!
-
-    """ 
-    if(With_coupling_blocks):
-        if( PostEE_plots ):
-            plot_utils.plot_correlation_matrix_diference_barrel( torch.tensor(data_vector) , torch.tensor(np.array(data_df[conditions_list])), data_test_weights, torch.tensor(np.array(mc_df[var_list])) , torch.tensor(np.array(mc_df[conditions_list])), mc_test_weights, torch.tensor(np.array(mc_df[var_list_corr])) ,  './plots/coupling/postEE/')
-        else:
-            plot_utils.plot_correlation_matrix_diference_barrel( torch.tensor(data_vector) , torch.tensor(np.array(data_df[conditions_list])), data_test_weights, torch.tensor(np.array(mc_df[var_list])) , torch.tensor(np.array(mc_df[conditions_list])), mc_test_weights, torch.tensor(np.array(mc_df[var_list_corr])) ,  './plots/coupling/preEE/')
-    else:
-        if( PostEE_plots ):
-            plot_utils.plot_correlation_matrix_diference_barrel( torch.tensor(data_vector) , torch.tensor(np.array(data_df[conditions_list])), data_test_weights, torch.tensor(np.array(mc_df[var_list])) , torch.tensor(np.array(mc_df[conditions_list])), mc_test_weights, torch.tensor(np.array(mc_df[var_list_corr])) ,  './plots/postEE/')
-        else:
-            plot_utils.plot_correlation_matrix_diference_barrel( torch.tensor(data_vector) , torch.tensor(np.array(data_df[conditions_list])), data_test_weights, torch.tensor(np.array(mc_df[var_list])) , torch.tensor(np.array(mc_df[conditions_list])), mc_test_weights, torch.tensor(np.array(mc_df[var_list_corr])) ,  './plots/preEE/')
-    """
-
     for i in range( np.shape(samples)[1] ):
 
-        mean = np.mean( np.array( data_vector[:,i] )  )
-        std  = np.std(  np.array( data_vector[:,i] )  )
+        mean = np.mean( np.nan_to_num(np.array( data_vector[:,i] ))  )
+        std  = np.std(  np.nan_to_num(np.array( data_vector[:,i] ))  )
 
-        if( 'Iso' in str(var_list[i])    ):
-            data_hist     = hist.new.Reg(45, 0.0, mean + 4.5*std, overflow=True).Weight() 
-            mc_hist       = hist.new.Reg(45, 0.0, mean + 4.5*std, overflow=True).Weight() 
-            mc_corr_hist  = hist.new.Reg(45, 0.0, mean + 4.5*std, overflow=True).Weight() 
-        elif( 'es' in str(var_list[i]) ):
-            data_hist     = hist.new.Reg(30, 0.0, mean + 2.8*std, overflow=True).Weight() 
-            mc_hist       = hist.new.Reg(30, 0.0, mean + 2.8*std, overflow=True).Weight() 
-            mc_corr_hist  = hist.new.Reg(30, 0.0, mean + 2.8*std, overflow=True).Weight()           
-        elif( 'hoe' in str(var_list[i]) ):
-            data_hist     = hist.new.Reg(25, 0.0, 0.08, overflow=True).Weight() 
-            mc_hist       = hist.new.Reg(25, 0.0, 0.08, overflow=True).Weight() 
-            mc_corr_hist  = hist.new.Reg(25, 0.0, 0.08, overflow=True).Weight() 
-        elif( 'DR' in str(var_list[i]) ):
-            data_hist     = hist.new.Reg(30, 0.0, 4.0, overflow=True).Weight() 
-            mc_hist       = hist.new.Reg(30, 0.0, 4.0, overflow=True).Weight() 
-            mc_corr_hist  = hist.new.Reg(30, 0.0, 4.0, overflow=True).Weight()        
-        elif( 'energy' in str(var_list[i]) ):
-            data_hist     = hist.new.Reg(36, 0.0, mean + 3.0*std, overflow=True).Weight() 
-            mc_hist       = hist.new.Reg(36, 0.0, mean + 3.0*std, overflow=True).Weight() 
-            mc_corr_hist  = hist.new.Reg(36, 0.0, mean + 3.0*std, overflow=True).Weight() 
-        elif( 'pt' in str(var_list[i]) or 'Rho' in str(var_list[i])):
+        if( str(var_list[i]) == 'pt'  ):
+            data_hist     = hist.new.Reg(50, 0.0, mean + 4*std, overflow=True).Weight() 
+            mc_hist       = hist.new.Reg(50, 0.0, mean + 4*std, overflow=True).Weight() 
+            mc_corr_hist  = hist.new.Reg(50, 0.0, mean + 4*std, overflow=True).Weight() 
+        elif( 'pt' in str(var_list[i]) ):
+            data_hist     = hist.new.Reg(50, 25, mean + 4*std, overflow=True).Weight() 
+            mc_hist       = hist.new.Reg(50, 25, mean + 4*std, overflow=True).Weight() 
+            mc_corr_hist  = hist.new.Reg(50, 25, mean + 4*std, overflow=True).Weight() 
+        elif( 'Rho' in str(var_list[i]) ):
             data_hist     = hist.new.Reg(50, mean - 4*std, mean + 4*std, overflow=True).Weight() 
             mc_hist       = hist.new.Reg(50, mean - 4*std, mean + 4*std, overflow=True).Weight() 
             mc_corr_hist  = hist.new.Reg(50, mean - 4*std, mean + 4*std, overflow=True).Weight() 
-        elif( 'eta' in str(var_list[i]) ):
+        elif( 'Eta' in str(var_list[i]) ):
             data_hist     = hist.new.Reg(50, -2.5, 2.5, overflow=True).Weight() 
             mc_hist       = hist.new.Reg(50, -2.5, 2.5, overflow=True).Weight() 
-            mc_corr_hist  = hist.new.Reg(50, -2.5, 2.5, overflow=True).Weight()    
-        elif( 'sieie' in str(var_list[i]) ):
-            data_hist     = hist.new.Reg(30, mean - 1.5*std, mean + 3.2*std, overflow=True).Weight() 
-            mc_hist       = hist.new.Reg(30, mean - 1.5*std, mean + 3.2*std, overflow=True).Weight() 
-            mc_corr_hist  = hist.new.Reg(30, mean - 1.5*std, mean + 3.2*std, overflow=True).Weight()             
-        elif( 'r9' in str(var_list[i]) ):
-            data_hist     = hist.new.Reg(28, 0.5, mean + 1.5*std, overflow=True).Weight() 
-            mc_hist       = hist.new.Reg(28, 0.5, mean + 1.5*std, overflow=True).Weight() 
-            mc_corr_hist  = hist.new.Reg(28, 0.5, mean + 1.5*std, overflow=True).Weight() 
-        elif(  's4' in str(var_list[i]) ):    
-            data_hist     = hist.new.Reg(30, mean - 4.5*std, mean + 2.5*std, overflow=True).Weight() 
-            mc_hist       = hist.new.Reg(30, mean - 4.5*std, mean + 2.5*std, overflow=True).Weight() 
-            mc_corr_hist  = hist.new.Reg(30, mean - 4.5*std, mean + 2.5*std, overflow=True).Weight() 
+            mc_corr_hist  = hist.new.Reg(50, -2.5, 2.5, overflow=True).Weight() 
+        elif( 'eta' in str(var_list[i])  ):   
+            data_hist     = hist.new.Reg(50, -6.5, 6.5, overflow=True).Weight() 
+            mc_hist       = hist.new.Reg(50, -6.5, 6.5, overflow=True).Weight() 
+            mc_corr_hist  = hist.new.Reg(50, -6.5, 6.5, overflow=True).Weight() 
+        elif( 'phi' in str(var_list[i])  ):   
+            data_hist     = hist.new.Reg(50, -3.1415, 3.1415, overflow=True).Weight() 
+            mc_hist       = hist.new.Reg(50, -3.1415, 3.1415, overflow=True).Weight() 
+            mc_corr_hist  = hist.new.Reg(50, -3.1415, 3.1415, overflow=True).Weight() 
+        elif( 'mass' in str(var_list[i])  ):   
+            data_hist     = hist.new.Reg(50, 80, 100, overflow=True).Weight() 
+            mc_hist       = hist.new.Reg(50, 80, 100, overflow=True).Weight() 
+            mc_corr_hist  = hist.new.Reg(50, 80, 100, overflow=True).Weight() 
         else:
             data_hist     = hist.new.Reg(30, mean - 1.5*std, mean + 1.5*std, overflow=True).Weight() 
             mc_hist       = hist.new.Reg(30, mean - 1.5*std, mean + 1.5*std, overflow=True).Weight() 
             mc_corr_hist  = hist.new.Reg(30, mean - 1.5*std, mean + 1.5*std, overflow=True).Weight() 
 
-        data_barrel_mask = np.abs(data_df["probe_ScEta"]) < 2.5442
-        mc_barrel_mask   = np.abs(mc_df["probe_ScEta"])   < 2.5442
+        data_hist.fill(     np.array( np.array(data_vector[:,i] )) )
+        mc_hist.fill(       np.array( np.array(mc_vector[:,i] )) , weight = len( np.array(data_vector[:,i] ))*mc_test_weights)
+        mc_corr_hist.fill(  np.array( np.array(samples[:,i]))    , weight = len( np.array(data_vector[:,i] ))*mc_test_weights)
 
-        data_hist.fill(     np.array( np.array(data_vector[:,i][data_barrel_mask] )) )
-        mc_hist.fill(       np.array( np.array(mc_vector[:,i][mc_barrel_mask] )) , weight = len( np.array(data_vector[:,i][data_barrel_mask] ))*mc_test_weights[mc_barrel_mask])
-        mc_corr_hist.fill(  np.array( np.array(samples[:,i][mc_barrel_mask]))    , weight = len( np.array(data_vector[:,i][data_barrel_mask] ))*mc_test_weights[mc_barrel_mask])
+        if( str(var_list[i]) == 'pt'  ):
+            var_list[i] = 'Dielectron_pt'
+        if( str(var_list[i]) == 'eta'  ):
+            var_list[i] = 'Dielectron_eta'
 
         if( PostEE_plots ):
-                plot_utils.plott( data_hist, mc_hist,mc_corr_hist, "./plots/postEE/" + str(var_list[i]) + '.pdf',  xlabel = str(var_list[i].replace("raw_","")), postEE = True, endcap=False )
+                plot_utils.plott( data_hist, mc_hist,mc_corr_hist, "./plots/" + str(var_list[i]) + '.pdf',  xlabel = str(var_list[i].replace("raw_","")), postEE = True, endcap=False )
         else:
-                plot_utils.plott( data_hist, mc_hist,mc_corr_hist, "./plots/preEE/" + str(var_list[i]) + '.pdf',  xlabel = str(var_list[i].replace("raw_","")), postEE = False, endcap=False )
+                plot_utils.plott( data_hist, mc_hist,mc_corr_hist, "./plots/" + str(var_list[i]) + '.pdf',  xlabel = str(var_list[i].replace("raw_","")), postEE = False, endcap=False )
 
-
-        if( 'mvaID' in str(var_list[i]) ):
-            
-            # plots for barrel and endcao
-            if(PostEE_plots):
-                data_hist     = hist.new.Reg(60, -0.9, 1.0, overflow=True).Weight() 
-                mc_hist       = hist.new.Reg(60, -0.9, 1.0, overflow=True).Weight() 
-                mc_corr_hist  = hist.new.Reg(60, -0.9, 1.0, overflow=True).Weight() 
-            else:
-                data_hist     = hist.new.Reg(60, -0.9, 1.0, overflow=True).Weight() 
-                mc_hist       = hist.new.Reg(60, -0.9, 1.0, overflow=True).Weight() 
-                mc_corr_hist  = hist.new.Reg(60, -0.9, 1.0, overflow=True).Weight() 
-
-            data_barrel_mask = np.abs(data_df["probe_ScEta"]) < 1.442
-            mc_barrel_mask   = np.abs(mc_df["probe_ScEta"]) < 1.442
-
-            #print( len(mc_barrel_mask ), len(mc_vector[:,i]), len(mc_test_weights) )
-            data_hist.fill(     np.array( np.array(data_vector[:,i][data_barrel_mask] )) )
-            mc_hist.fill(       np.array( np.array(mc_vector[:,i][mc_barrel_mask] ))   , weight = mc_test_weights[mc_barrel_mask])
-            mc_corr_hist.fill(  np.array( np.array(samples[:,i][mc_barrel_mask]))  , weight = mc_test_weights[mc_barrel_mask])
-
-
-            if( PostEE_plots ):
-                plot_utils.plott( data_hist, mc_hist,mc_corr_hist, "./plots/postEE/barrel_" + str(var_list[i]) + '.pdf',  xlabel = str(var_list[i]), postEE = True, endcap=False )
-            else:
-                plot_utils.plott( data_hist, mc_hist,mc_corr_hist, "./plots/preEE/barrel_" + str(var_list[i]) + '.pdf',  xlabel = str(var_list[i]), postEE = False, endcap=False )
-
-            #################
-            # Now, endcap!
-            data_hist     = hist.new.Reg(50, -0.9, 1.0, overflow=True).Weight() 
-            mc_hist       = hist.new.Reg(50, -0.9, 1.0, overflow=True).Weight() 
-            mc_corr_hist  = hist.new.Reg(50, -0.9, 1.0, overflow=True).Weight() 
-
-            data_barrel_mask = np.abs(data_df["probe_ScEta"]) > 1.56
-            mc_barrel_mask   = np.abs(mc_df["probe_ScEta"])   > 1.56
-
-            data_hist.fill(     np.array( np.array(data_vector[:,i][data_barrel_mask] )) )
-            mc_hist.fill(       np.array( np.array(mc_vector[:,i][mc_barrel_mask] ))   , weight = mc_test_weights[mc_barrel_mask])
-            mc_corr_hist.fill(  np.array( np.array(samples[:,i][mc_barrel_mask]))  , weight = mc_test_weights[mc_barrel_mask])
-
-            if( PostEE_plots ):
-                plot_utils.plott( data_hist, mc_hist,mc_corr_hist, "./plots/postEE/endcap_" + str(var_list[i]) + '.pdf',  xlabel = str(var_list[i]), postEE = True, endcap=True )                
-            else:
-                plot_utils.plott( data_hist, mc_hist,mc_corr_hist, "./plots/preEE/endcap_" + str(var_list[i]) + '.pdf',  xlabel = str(var_list[i]), postEE = False, endcap=True )
 
 if __name__ == "__main__":
     main()
